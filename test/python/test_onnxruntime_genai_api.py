@@ -549,7 +549,7 @@ def test_preset_extra_inputs(device, phi2_for, extra_inputs):
             model,
             Path(extra_inputs_model_path) / "model.onnx",
             save_as_external_data=True,
-            location="model.data",
+            location="model-extra-inputs.data",
         )
 
         return valid
