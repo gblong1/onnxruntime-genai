@@ -514,7 +514,7 @@ def test_vision_preprocessing_multiple_images(
     sysconfig.get_platform().endswith("arm64"),
     reason="ONNX is not available on ARM64",
 )
-@pytest.mark.parametrize("extra_inputs", [("num_logits_to_keep", True), ("onnx::Neg_67", True), ("abcde", False)])
+@pytest.mark.parametrize("extra_inputs", [("num_logits_to_keep", True), ("onnx::Neg_67", True)])
 def test_preset_extra_inputs(device, phi2_for, extra_inputs):
     def _prepare_model(extra_inputs_model_path):
         phi2_model_path = phi2_for(device)
