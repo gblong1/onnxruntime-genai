@@ -180,6 +180,7 @@ struct Config {
         int pad_value{};                   // The key-value cache padding value to use for the sliding window for inactive tokens
         std::string alignment{"right"};    // The alignment of the window, either "left" or "right"
         bool slide_key_value_cache{true};  // Whether to slide the key-value cache along with the input prompt
+        bool slide_inputs{true};           // Whether to slide the input prompt along with the key-value cache
       };
       std::optional<SlidingWindow> sliding_window;
 
@@ -256,7 +257,8 @@ struct Config {
   // otherwise returns the nominal name and false
   std::pair<std::string, bool> GetGraphName(const std::string& nominal_name) const;
 
-  std::unordered_map<std::string, std::string> nominal_names_to_graph_names_;  // Mapping of nominal input/output names to graph input/output names
+  std::unordered_map<std::string, std::string> nominal_names_to_graph_names_;     // Mapping of nominal input/output names to graph input/output names
+  std::unordered_map<std::string, std::span<const std::byte>> model_data_spans_;  // Model bytes to support loading a model from memory
 };
 
 void SetSearchNumber(Config::Search& search, std::string_view name, double value);

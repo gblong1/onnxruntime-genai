@@ -17,6 +17,8 @@ import pytest
 
 if not sysconfig.get_platform().endswith("arm64"):
     # Skip importing onnx if running on ARM64
+    # TODO(justinchuby): ONNX 1.18 supports arm64. Remove the condition when
+    # there is a version bump
     import onnx
 
 devices = ["cpu"]
@@ -278,12 +280,9 @@ def test_rewind(test_data_path, relative_model_path):
 
 # Test Model Loading with No Chat Template
 
-
-# TODO: CUDA pipelines use python3.6 and do not have a way to download models since downloading models
-# requires pytorch and hf transformers. This test should be re-enabled once the pipeline is updated.
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 @pytest.mark.parametrize("batch", [True, False])
@@ -312,8 +311,8 @@ def test_tokenizer_encode_decode(device, phi2_for, batch):
 
 # Test Chat Template Supported Model
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 def test_phi3_chat_template(device, phi3_for):
@@ -332,8 +331,8 @@ def test_phi3_chat_template(device, phi3_for):
 
 # Test Chat Template Unsupported Model with Template String Override
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 def test_phi2_chat_template(device, phi2_for):
@@ -356,8 +355,8 @@ def test_phi2_chat_template(device, phi2_for):
 
 
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 def test_tokenizer_stream(device, phi2_for):
@@ -379,12 +378,9 @@ def test_tokenizer_stream(device, phi2_for):
 
         assert decoded_string == prompt
 
-
-# TODO: CUDA pipelines use python3.6 and do not have a way to download models since downloading models
-# requires pytorch and hf transformers. This test should be re-enabled once the pipeline is updated.
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 def test_batching(device, phi2_for):
@@ -410,16 +406,45 @@ def test_batching(device, phi2_for):
     for i in range(len(prompts)):
         print(tokenizer.decode(generator.get_sequence(0)))
 
-
-# TODO: CUDA pipelines use python3.6 and do not have a way to download models since downloading models
-# requires pytorch and hf transformers. This test should be re-enabled once the pipeline is updated.
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 def test_e2e(device, phi2_for):
     model = og.Model(phi2_for(device))
+    tokenizer = og.Tokenizer(model)
+
+    prompts = [
+        "This is a test.",
+    ]
+
+    params = og.GeneratorParams(model)
+    params.set_search_options(max_length=20, batch_size=len(prompts))  # To run faster
+
+    generator = og.Generator(model, params)
+    generator.append_tokens(tokenizer.encode_batch(prompts))
+    while not generator.is_done():
+        generator.generate_next_token()
+    for i in range(len(prompts)):
+        print(tokenizer.decode(generator.get_sequence(0)))
+
+@pytest.mark.skipif(
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
+)
+@pytest.mark.parametrize("device", devices)
+@pytest.mark.parametrize("wrapper_bytes_function", [lambda x: x, bytearray, memoryview])
+def test_load_model_from_memory(device, wrapper_bytes_function, phi2_for):
+    model_path = phi2_for(device)
+    config = og.Config(model_path)
+    model_data = None
+    with open(os.path.join(model_path, "model.onnx"), 'rb') as model_file:
+        model_data = wrapper_bytes_function(model_file.read())
+
+    config.add_model_data("model.onnx", model_data)
+    model = og.Model(config)
+    config.remove_model_data("model.onnx")
     tokenizer = og.Tokenizer(model)
 
     prompts = [
@@ -522,8 +547,8 @@ def test_get_output(test_data_path, relative_model_path):
 
 
 @pytest.mark.skipif(
-    sysconfig.get_platform().endswith("arm64") or sys.version_info.minor < 8,
-    reason="Python 3.8 is required for downloading models.",
+    sysconfig.get_platform().endswith("arm64"),
+    reason="Model is not available on arm64.",
 )
 @pytest.mark.parametrize("device", devices)
 def test_hidden_states(qwen_for, device):
@@ -559,6 +584,9 @@ def test_pipeline_model(test_data_path, phi2_for, relative_model_path):
         """Extract a subgraph from the input model and save it to the output path"""
 
         model = onnx.load(input_path)
+        # Add all value info out the model output to value_info list for the
+        # extractor to find the value properly
+        model.graph.value_info.extend(model.graph.output)
 
         e = onnx.utils.Extractor(model)
         extracted = e.extract_model(input_names, output_names)
