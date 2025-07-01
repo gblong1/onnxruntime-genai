@@ -40,7 +40,7 @@ void CXX_API(const char* model_path, const char* execution_provider) {
   std::thread th(std::bind(&TerminateSession::Generator_SetTerminate_Call, &catch_terminate, generator.get()));
 
   // Define System Prompt
-  const std::string system_prompt = std::string("<|system|>\n") + "You are a helpful AI and give elaborative answers" + "<|end|>";
+  const OgaString system_prompt = OgaString("<|system|>\n You are a helpful AI and give elaborative answers <|end|>");
   bool include_system_prompt = true;
 
   while (true) {
@@ -55,7 +55,7 @@ void CXX_API(const char* model_path, const char* execution_provider) {
       break;  // Exit the loop
     }
 
-    const std::string prompt = tokenizer->ApplyChatTemplate("", text.c_str(), "", true);
+    auto prompt = tokenizer->ApplyChatTemplate("", text.c_str(), "", true);
 
     bool is_first_token = true;
     Timing timing;
@@ -63,11 +63,11 @@ void CXX_API(const char* model_path, const char* execution_provider) {
 
     auto sequences = OgaSequences::Create();
     if (include_system_prompt) {
-      std::string combined = system_prompt + prompt;
-      tokenizer->Encode(combined.c_str(), *sequences);
+      auto combined = system_prompt + prompt;
+      tokenizer->Encode(combined, *sequences);
       include_system_prompt = false;
     } else {
-      tokenizer->Encode(prompt.c_str(), *sequences);
+      tokenizer->Encode(prompt, *sequences);
     }
 
     std::cout << "Generating response..." << std::endl;

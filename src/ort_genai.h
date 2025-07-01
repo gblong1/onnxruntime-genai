@@ -98,14 +98,56 @@ inline constexpr OgaElementType OgaTypeToElementType<OgaFloat16_t> = OgaElementT
 template <>
 inline constexpr OgaElementType OgaTypeToElementType<OgaBFloat16_t> = OgaElementType_bfloat16;
 
+// Simulated external C-style functions
+inline char* OgaCloneString(const char* src) {
+  if (!src) return nullptr;
+  size_t len = std::strlen(src) + 1;
+  char* dest = static_cast<char*>(std::malloc(len));
+  if (dest) std::memcpy(dest, src, len);
+  return dest;
+}
+
+inline char* OgaConcatStrings(const char* a, const char* b) {
+  if (!a) return OgaCloneString(b);
+  if (!b) return OgaCloneString(a);
+  size_t len = std::strlen(a) + std::strlen(b) + 1;
+  char* result = static_cast<char*>(std::malloc(len));
+  if (!result) return nullptr;
+#ifdef _MSC_VER
+  strcpy_s(result, len, a);
+  strcat_s(result, len, b);
+#else
+  std::strcpy(result, a);
+  std::strcat(result, b);
+#endif
+  return result;
+}
+
+inline void OgaDestroyString(const char* p) {
+  std::free(const_cast<char*>(p));
+}
+
 struct OgaString {
-  OgaString(const char* p) : p_{p} {}
+  explicit OgaString(const char* p) : p_{OgaCloneString(p)} {}
+  OgaString(const OgaString& other) : p_{OgaCloneString(other.p_)} {}
+  OgaString& operator=(const OgaString& other) {
+    if (this != &other) {
+      OgaDestroyString(p_);
+      p_ = OgaCloneString(other.p_);
+    }
+    return *this;
+  }
   ~OgaString() { OgaDestroyString(p_); }
 
   operator const char*() const { return p_; }
 
+  OgaString operator+(const OgaString& rhs) const {
+    return OgaString(OgaConcatStrings(this->p_, rhs.p_));
+  }
+
   const char* p_;
 };
+
 
 struct OgaStringArray {
   std::unique_ptr<OgaStringArray> Create() {
@@ -220,14 +262,15 @@ struct OgaModel : OgaAbstract {
   OgaString GetType() const {
     const char* p;
     OgaCheckResult(OgaModelGetType(this, &p));
-    return p;
+    return OgaString(p);
   }
 
   OgaString GetDeviceType() const {
     const char* p;
     OgaCheckResult(OgaModelGetDeviceType(this, &p));
-    return p;
+    return OgaString(p);
   }
+
 
   static void operator delete(void* p) { OgaDestroyModel(reinterpret_cast<OgaModel*>(p)); }
 };
@@ -300,20 +343,20 @@ struct OgaTokenizer : OgaAbstract {
   OgaString Decode(const int32_t* tokens_data, size_t tokens_length) const {
     const char* p;
     OgaCheckResult(OgaTokenizerDecode(this, tokens_data, tokens_length, &p));
-    return p;
+    return OgaString(p);
   }
 
   OgaString ApplyChatTemplate(const char* template_str, const char* messages, const char* tools, bool add_generation_prompt) const {
     const char* p{};
     OgaCheckResult(OgaTokenizerApplyChatTemplate(this, template_str, messages, tools, add_generation_prompt, &p));
-    return p;
+    return OgaString(p);
   }
 
 #if OGA_USE_SPAN
   OgaString Decode(std::span<const int32_t> tokens) const {
     const char* p;
     OgaCheckResult(OgaTokenizerDecode(this, tokens.data(), tokens.size(), &p));
-    return p;
+    return OgaString(p);
   }
 #endif
 
@@ -643,14 +686,14 @@ struct OgaMultiModalProcessor : OgaAbstract {
   OgaString Decode(const int32_t* tokens_data, size_t tokens_length) const {
     const char* p;
     OgaCheckResult(OgaProcessorDecode(this, tokens_data, tokens_length, &p));
-    return p;
+    return OgaString(p);
   }
 
 #if OGA_USE_SPAN
   OgaString Decode(std::span<const int32_t> tokens) const {
     const char* p;
     OgaCheckResult(OgaProcessorDecode(this, tokens.data(), tokens.size(), &p));
-    return p;
+    return OgaString(p);
   }
 #endif
 
